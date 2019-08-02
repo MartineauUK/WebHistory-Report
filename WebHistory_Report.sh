@@ -1,6 +1,6 @@
 #!/bin/sh
-VER="v1.10"
-#======================================================================================= © 2016-2018 Martineau v1.10
+VER="v1.11"
+#======================================================================================= © 2016-2019 Martineau v1.11
 #
 # Scan Web History database
 #
@@ -507,7 +507,10 @@ fi
 
 # "dpi: TrendMicro function can't use under load-balance mode" 
 
-Chk_Entware                'sqlite3'  || { echo -e $cBRED"\a\n\t\t***ERROR*** Entware" $ENTWARE_UTILITY "not available\n"$cRESET;exit 99; }
+# v384.11 now includes '/usr/sbin/sqlite3' 				# v1.11
+if [ -z "$(which sqlite3)" ];then
+	Chk_Entware                'sqlite3'  || { echo -e $cBRED"\a\n\t\t***ERROR*** Entware" $ENTWARE_UTILITY "not available\n"$cRESET;exit 99; }
+fi
 
 SQL_DB_DESC="Web History"
 SQL_TABLE="history"
