@@ -1,12 +1,12 @@
 #!/bin/sh
-VER="v1.12"
-#======================================================================================= © 2016-2019 Martineau v1.12
+VER="v1.13"
+#======================================================================================= © 2016-2019 Martineau v1.13
 #
 # Scan Web History database
 #
 #    WebHistory_Report     [help | -h] ['ip='{[ip_address[,...] | hostname[...]]} ['flush']] ['url='{url_string[,...]}] ['nofilter'] ['email'] ['mode=or'] ['noscript']
 #                          ['date='[yyyy/mm/dd[,...]]] ['time='[hh:mm:ss[,...]]] ['sqldb='{database}] ['backup[=directory]'] ['purgeallreset'] ['count'] ['sortby='column]
-#    WebHistory_Report     ['mac='mac_address[,...]] ['report='{file_name}] ['nodisplay']
+#    WebHistory_Report     ['mac='mac_address[,...]] ['report='{file_name}] ['nodisplay'] ['showsql']
 #
 #    WebHistory_Report
 #                          Will list 'Todays' URL entries in the Web History database containing strings 'facebook' OR 'youtube'
@@ -51,6 +51,8 @@ VER="v1.12"
 #                          The report/queries will be extracted from the archive/backup database '/opt/var/WebHistory/WebHistory.db-Backup-20180401-060000'
 #    WebHistory_Report     purgeallreset
 #                          The current Web History database is PURGED of ALL history!!!!! (NOTE: a backup is taken first ;-)
+#    WebHistory_Report     showsql
+#                          Debug the resulting filter(s) by showing the actual SQL query
 
 # To filter by additional criteria just use grep/awk etc. to apply additional filters
 #
@@ -541,10 +543,11 @@ COLORTIME=$cBGRE                                    # Highlight Default sort col
 COLORMAC="$cBCYA"
 COLORIP="$cBCYA"
 COLORURL="$cBCYA"
-BACKUP_DIR="/opt/var"                               # Default backup directory - i.e. Entware or can be overidded by commandline
+BACKUP_DIR="/opt/var"                               # v1.12 Default backup directory - i.e. Entware or can be overidded by commandline
 
 USE_TODAYS_DATE=1                                   # v1.08
 USE_CURRENT_HOUR=1                                  # v1.08
+SHOWSQL=0                                           # v1.13 Debug i.e. show SQL query
 
 # Check options
 DUMMY="=================================================================== Options"
@@ -562,6 +565,10 @@ while [ $# -gt 0 ]; do    # Until you run out of parameters . . .       # v1.07
             esac
             echo $WHERE
             [ -n "$FILTER_INUSE" ] && { echo -e $cBRED"\a\n\t\t***ERROR '$1' MUST precede filter specification '$FILTER_INUSE'\n"$cRESET; exit 99;}
+            ;;
+    showsql)                                # v1.13
+            CMDSHOWSQL="ShowSQL"
+            SHOWSQL=1
             ;;
     noscript)
             CMDNOSCRIPT="NoScript"
@@ -965,12 +972,15 @@ if [ -z "$CMDNOSCRIPT" ];then
     else
         # Rather than loop thru' each record to create .csv, simply allow SQL to create the .csv - much faster!
         if [ "$CMDREPORT" = "CreateCSV" ] && [ "$CMDNODISPLAY" = "NoDISPLAY" ];then     # v1.12
+            [ $SHOWSQL -eq 1 ] && echo -e "sqlite3 -csv $SQL_DATABASE SELECT datetime(timestamp, 'unixepoch', 'localtime') AS time, mac, url FROM $SQL_TABLE $WHERE ORDER BY $SORTBY;\n"    # v1.13
             sqlite3 -csv $SQL_DATABASE "SELECT datetime(timestamp, 'unixepoch', 'localtime') AS time, mac, url FROM $SQL_TABLE $WHERE ORDER BY $SORTBY;" > $REPORT_CSV
+            [ $SHOWSQL -eq 1 ] && echo -e "sqlite3 $SQL_DATABASE SELECT datetime(timestamp, 'unixepoch', 'localtime') AS time, mac, url, count(*) FROM $SQL_TABLE $WHERE ORDER BY $SORTBY;\n"   # v1.13
             RESULT_CNT=$(sqlite3 $SQL_DATABASE "SELECT datetime(timestamp, 'unixepoch', 'localtime') AS time, mac, url, count(*) FROM $SQL_TABLE $WHERE ORDER BY $SORTBY;"  | cut -d'|' -f4)
             nvram set tmp_WH_TOTAL=$RESULT_CNT
             StatusLine $CMDNOANSII"Clear"
             StatusLine $CMDNOANSII"NoFLASH" ${IND}$aREVERSE"Summary: Result count = "$RESULT_CNT" "
         else
+            [ $SHOWSQL -eq 1 ] && echo -e "sqlite3 $SQL_DATABASE SELECT datetime(timestamp, 'unixepoch', 'localtime') AS time, mac, url FROM $SQL_TABLE $WHERE ORDER BY $SORTBY;\n" # v1.13
             sqlite3 $SQL_DATABASE "SELECT datetime(timestamp, 'unixepoch', 'localtime') AS time, mac, url FROM $SQL_TABLE $WHERE ORDER BY $SORTBY;" | while IFS= read -r LINE
 
                 do
@@ -1082,6 +1092,7 @@ if [ -z "$CMDNOSCRIPT" ];then
         # Delete specified URL history for device if 'url=' specified otherwise
         # if 'ip=10.88.8.1 flush' then mass delete ALL history for the IP (aka MAC address)
         if [ "$CMDIPFLUSH" == "IPFlush" ];then
+            [ $SHOWSQL -eq 1 ] && echo -e "sqlite3 $SQL_DATABASE DELETE from $SQL_TABLE WHERE $MAC_SQL) AND $URL_SQL)"  # v1.13
             sqlite3 $SQL_DATABASE "DELETE from $SQL_TABLE WHERE $MAC_SQL) AND $URL_SQL)"
             RC=$?
         fi
@@ -1118,12 +1129,15 @@ else
     echo -e $cBYEL
     if [ -z "$CMDCOUNT" ];then                                                  # v1.10
         if [ "$CMDREPORT" = "CreateCSV" ];then                                  # v1.12 
+            [ $SHOWSQL -eq 1 ] && echo -e "sqlite3 -header -csv $SQL_DATABASE SELECT * FROM $SQL_TABLE;\n"  # v1.13
             sqlite3 -header -csv $SQL_DATABASE "SELECT * FROM $SQL_TABLE;" > $REPORT_CSV    # Use '*' for raw table
         else
             # NOTE: Display/create the additional human-friendly timestamp! 
+            [ $SHOWSQL -eq 1 ] && echo -e "sqlite3 $SQL_DATABASE SELECT datetime(timestamp, 'unixepoch', 'localtime') AS time, timestamp, mac, url FROM $SQL_TABLE $WHERE;\n"   # v1.13
             sqlite3 $SQL_DATABASE "SELECT datetime(timestamp, 'unixepoch', 'localtime') AS time, timestamp, mac, url FROM $SQL_TABLE $WHERE;"
         fi
     fi
+    [ $SHOWSQL -eq 1 ] && echo -e "sqlite3 $SQL_DATABASE SELECT datetime(timestamp, 'unixepoch', 'localtime') AS time, count(*) FROM $SQL_TABLE $WHERE;\n"  # v1.13
     SQL_TOTAL=$(sqlite3 $SQL_DATABASE "SELECT datetime(timestamp, 'unixepoch', 'localtime') AS time, count(*) FROM $SQL_TABLE $WHERE;" | cut -d'|' -f2)
     echo -e $cBGRE"\nTotal Records = "$SQL_TOTAL
 fi
