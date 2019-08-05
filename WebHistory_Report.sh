@@ -1,6 +1,6 @@
 #!/bin/sh
-VER="v1.13"
-#======================================================================================= © 2016-2019 Martineau v1.13
+VER="v1.14"
+#======================================================================================= © 2016-2019 Martineau v1.14
 #
 # Scan Web History database
 #
@@ -486,7 +486,7 @@ Backup_DB() {
     RC=$?
     if [ $RC -eq 0 ];then
         echo -en $cBGRE >&2
-        Say "'"$DB"' backup completed successfully"
+        Say "'"$DB"' backup completed successfully to '"$BACKUP_DIR/$DB_DIR/$DBNAME-Backup-$NOW"'"
     else
         echo -e "\a"
         Say "***ERROR '"$DB"' backup FAILED!"
