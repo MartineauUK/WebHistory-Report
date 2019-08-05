@@ -477,8 +477,8 @@ Backup_DB() {
 
     echo -en $cBRED >&2
 
-    mkdir -p /opt/var/$DB_DIR
-    cp -p $DB /opt/var/$DB_DIR/$DBNAME-Backup-$NOW
+    mkdir -p $BACKUP_DIR/$DB_DIR
+    cp -p $DB $BACKUP_DIR/$DB_DIR/$DBNAME-Backup-$NOW
     RC=$?
     if [ $RC -eq 0 ];then
         echo -en $cBGRE >&2
@@ -539,6 +539,7 @@ COLORTIME=$cBGRE                                    # Highlight Default sort col
 COLORMAC="$cBCYA"
 COLORIP="$cBCYA"
 COLORURL="$cBCYA"
+BACKUP_DIR="/opt/var"                               # Default backup directory - i.e. Entware or can be overidded by commandline
 
 USE_TODAYS_DATE=1                                   # v1.08
 USE_CURRENT_HOUR=1                                  # v1.08
@@ -782,8 +783,19 @@ while [ $# -gt 0 ]; do    # Until you run out of parameters . . .       # v1.07
     nofilter)
             CMDNOFILTER="NoFilter"
             ;;
-    backup)
-            CMDBACKUP="Backup"
+    backup|backup=*)                            # v1.12
+            if [ "$1" = "backup" ];then
+                CMDBACKUP="Backup"              # Use default '/opt/var/' Entware  
+            else
+                CMDBACKUP="$(echo "$1" | sed -n "s/^.*backup=//p" | awk '{print $1}')"
+                if [ "$CMDBACKUP" = "/tmp" ] || [ ! -d "$CMDBACKUP" ];then
+                    echo -e $cBRED"\a\n\t***ERROR Backup location '"$1"' INVALID. e.g. use a permanent disk e.g. '/mnt/xxxx' but NOT simply '/tmp' or '/tmp/'\n"$cRESET
+                    exit 99
+                else
+                    BACKUP_DIR=$CMDBACKUP
+                    CMDBACKUP="Backup"
+                fi
+            fi
             ;;
     purgeallreset)
             CMDPURGEALLRESET="PurgeAllReset"
