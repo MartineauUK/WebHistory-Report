@@ -5,7 +5,7 @@ VER="v1.12"
 # Scan Web History database
 #
 #    WebHistory_Report     [help | -h] ['ip='{[ip_address[,...] | hostname[...]]} ['flush']] ['url='{url_string[,...]}] ['nofilter'] ['email'] ['mode=or'] ['noscript']
-#                          ['date='[yyyy/mm/dd[,...]]] ['time='[hh:mm:ss[,...]]] ['sqldb='{database}] ['backup'] ['purgeallreset'] ['count'] ['sortby='column]
+#                          ['date='[yyyy/mm/dd[,...]]] ['time='[hh:mm:ss[,...]]] ['sqldb='{database}] ['backup[=directory]'] ['purgeallreset'] ['count'] ['sortby='column]
 #    WebHistory_Report     ['mac='mac_address[,...]] ['report='{file_name}] ['nodisplay']
 #
 #    WebHistory_Report
@@ -44,7 +44,9 @@ VER="v1.12"
 #                          Will list entries in the Web History database created between '09:00' to '09:59'
 #                          NOTE: A full time specification can be used e.g. '12:05:30' but the report may never find a match!
 #    WebHistory_Report     backup
-#                          The current Web History database will be backed up to '/opt/var/WebHistory/'
+#                          The current Web History database will be backed up to Entware disk '/opt/var/WebHistory/'
+#    WebHistory_Report     backup=/mnt/MyDisk
+#                          The current Web History database will be backed up to '/mnt/Mydisk/WebHistory/'
 #    WebHistory_Report     sqldb=/opt/var/WebHistory/WebHistory.db-Backup-20180401-060000
 #                          The report/queries will be extracted from the archive/backup database '/opt/var/WebHistory/WebHistory.db-Backup-20180401-060000'
 #    WebHistory_Report     purgeallreset
