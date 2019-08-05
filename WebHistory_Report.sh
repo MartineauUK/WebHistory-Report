@@ -6,7 +6,7 @@ VER="v1.12"
 #
 #    WebHistory_Report     [help | -h] ['ip='{[ip_address[,...] | hostname[...]]} ['flush']] ['url='{url_string[,...]}] ['nofilter'] ['email'] ['mode=or'] ['noscript']
 #                          ['date='[yyyy/mm/dd[,...]]] ['time='[hh:mm:ss[,...]]] ['sqldb='{database}] ['backup'] ['purgeallreset'] ['count'] ['sortby='column]
-#    WebHistory_Report     ['report='{file_name}] ['nodisplay']
+#    WebHistory_Report     ['mac='mac_address[,...]] ['report='{file_name}] ['nodisplay']
 #
 #    WebHistory_Report
 #                          Will list 'Todays' URL entries in the Web History database containing strings 'facebook' OR 'youtube'
@@ -34,6 +34,8 @@ VER="v1.12"
 #                          Will list database entries for five devices, plus all IPs for 'CAMERAS' entry in '/jffs/configs/IPGroups'
 #                          NOTE: Only MAC addresses are stored in the database so if the devices are not 'reserved/static'
 #                                then the report could be inaccurate.
+#    WebHistory_Report     mac=de:ad:de:ad:de:ad
+#                          Will list entries in Web History database for MAC address 'de:ad:de:ad:de:ad'
 #    WebHistory_Report     ip=10.88.8.123 flush url="www.veryexpensiveshoes.com"
 #                          Will delete all URL 'www.veryexpensiveshoes.com' history for '10.88.8.123' Ha ha - wife mode eh? ;-)
 #    WebHistory_Report     ip=10.88.8.123 flush
