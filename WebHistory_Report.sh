@@ -1,6 +1,6 @@
 #!/bin/sh
-VER="v1.14"
-#======================================================================================= © 2016-2019 Martineau v1.14
+VER="v1.15"
+#======================================================================================= © 2016-2022 Martineau v1.15
 #
 # Scan Web History database
 #
@@ -375,6 +375,18 @@ Convert_TO_IP() {
     #
     #       I/P address    hostname
     #
+    # v386+
+    # Use /etc/dnsmasq.conf
+    # NOTE: etc/host.dnsmasq is in format
+    #
+    #     dhcp-host=48:45:20:D7:A6:22,set:48:45:20:D7:A6:22,HP-Envy13,192.168.1.38
+    #
+    #     grep "^dhcp-host" /etc/dnsmasq.conf | grep -E "192.168.1.38$"
+    #     or
+    #     grep "^dhcp-host" /etc/dnsmasq.conf | grep -iE "HP-Envy13"
+    #
+
+
 
     local USEPATH="/jffs/configs"
 
@@ -392,7 +404,9 @@ Convert_TO_IP() {
 
            if [ -z "$IP_RANGE" ];then       # Not PINGable so lookup static
 
-              IP_RANGE=$(grep -i "$IP_NAME" /etc/hosts.dnsmasq  | awk '{print $1}')
+              #IP_RANGE=$(grep -i "$IP_NAME" /etc/hosts.dnsmasq  | awk '{print $1}')
+              IP_RANGE=$(grep "$IP_NAME" /etc/dnsmasq.conf | grep -E "192.168.1.38$")
+
               #logger -s -t "($(basename $0))" $$ "Lookup '$IP_NAME' in DNSMASQ returned:>$IP_RANGE<"
 
               # If entry not matched in /etc /hosts.dnsmasq see if it exists in our IPGroups lookup file
@@ -452,19 +466,29 @@ MAC_to_IP() {
             # etc/ethers no longer exists/used
             # Instead /etc/dnsmasq.conf contains
             #         dhcp-host=00:22:B0:B5:BB:1A,10.88.8.254
+            # v386+
+            #         dhcp-host=48:45:20:D7:A6:22,set:48:45:20:D7:A6:22,HP-Envy13,192.168.1.38
             FN="/etc/dnsmasq.conf"
-            local ADDR_LIST=$(grep -i "$MAC" "$FN" | awk 'BEGIN {FS=","} {print $2}')
+            #local ADDR_LIST=$(grep -i "$MAC" "$FN" | awk 'BEGIN {FS=","} {print $2}')
+            local ADDR_LIST=$(grep -i "$MAC" "$FN" | awk 'BEGIN {FS=","} {print $4}')               # v1.15
         else
             local ADDR_LIST=$(grep -i "$MAC" "$FN" | awk '{print $2}')
         fi
 
         if [ -n "$ADDR_LIST" ];then
             IP_RANGE=$ADDR_LIST
-            IP_ADDR=`grep -i -w "$IP_RANGE" /etc/hosts.dnsmasq | awk '{print $1}'`
-            HOST_NAME=`grep -i -w "$IP_RANGE" /etc/hosts.dnsmasq | awk '{print $2}'`
+            IP_ADDR=$(grep   -iE "$IP_RANGE" $FN | awk 'BEGIN {FS=","} {print $4}')                 # v1.15
+            HOST_NAME=$(grep -iE "$IP_RANGE" $FN | awk 'BEGIN {FS=","} {print $3}')                 # v1.15
             RESULT=$HOST_NAME" "$IP_ADDR
         else
-            RESULT="***ERROR MAC Address not on LAN ("$FN"): '"$2"'"
+            ADDR_LIST="$(arp -a | awk '{print $2","$4","$1}' | tr -d '()' | grep -iF "$MAC")"       # v1.15
+            if [ -n "$ADDR_LIST" ];then                                                             # v1.15
+                IP_ADDR=$(echo "$ADDR_LIST" | awk 'BEGIN {FS=","} {print $1}')                      # v1.15
+                HOST_NAME=$(echo "$ADDR_LIST" | awk 'BEGIN {FS=","} {print $3}')                    # v1.15
+                RESULT=$HOST_NAME" "$IP_ADDR
+            else
+                RESULT="***ERROR MAC Address not on LAN ("$FN"): '"$2"'"
+            fi
         fi
 
         echo "$RESULT"
@@ -502,7 +526,9 @@ Main() { true; }            # Syntax that is Atom Shellchecker compatible!
 
 ANSIColours
 
-MYROUTER=$(nvram get computer_name)
+# v384.13+ NVRAM variable 'lan_hostname' supersedes 'computer_name'
+[ -n "$(nvram get computer_name)" ] && MYROUTER=$(nvram get computer_name) || MYROUTER=$(nvram get lan_hostname)
+
 
 FIRMWARE=$(echo $(nvram get buildno) | awk 'BEGIN { FS = "." } {printf("%03d%02d",$1,$2)}')
 
@@ -515,7 +541,7 @@ if [ "$1" == "-h" ] || [ "$1" == "help" ];then
     exit 0
 fi
 
-# "dpi: TrendMicro function can't use under load-balance mode" 
+# "dpi: TrendMicro function can't use under load-balance mode"
 
 # v384.11 now includes '/usr/sbin/sqlite3'              # v1.11
 if [ -z "$(which sqlite3)" ];then
@@ -667,12 +693,12 @@ while [ $# -gt 0 ]; do    # Until you run out of parameters . . .       # v1.07
             [ -z "$FILTER_INUSE" ] && FILTER_DESC="by MAC" || FILTER_DESC=$FILTER_DESC", "$MODE" by MAC"
 
             MAC_SQL=                # v1.04 SQL statement for multiple 'MAC match'
-            
+
 
 
             LAN_MACS=$(echo "$LAN_MACS" | sed 's/^ //p')
             LAN_MACS=$(echo "$LAN_MACS" | awk '{for (i=1;i<=NF;i++) if (!a[$i]++) printf("%s%s",$i,FS)}')   # Remove duplicates
-            
+
             for MAC in $MAC_LIST
                     do
                         if [ -n "$(echo "$MAC" | Is_MAC_Address )" ];then
@@ -687,7 +713,7 @@ while [ $# -gt 0 ]; do    # Until you run out of parameters . . .       # v1.07
 
             [ -z "$FILTER_INUSE" ] && FILTER_INUSE=$MAC_FILTER || FILTER_INUSE=$FILTER_INUSE"|"$MAC_FILTER
 
-            [ -z "$WHERE" ] && WHERE="WHERE ("$MAC_SQL")" || WHERE=$WHERE" "$MODE" "$MAC_SQL")" 
+            [ -z "$WHERE" ] && WHERE="WHERE ("$MAC_SQL")" || WHERE=$WHERE" "$MODE" "$MAC_SQL")"
             ;;
     ip=*)
             # If Hostname/IP then filter on MAC address
@@ -794,7 +820,7 @@ while [ $# -gt 0 ]; do    # Until you run out of parameters . . .       # v1.07
             ;;
     backup|backup=*)                            # v1.12
             if [ "$1" = "backup" ];then
-                CMDBACKUP="Backup"              # Use default '/opt/var/' Entware  
+                CMDBACKUP="Backup"              # Use default '/opt/var/' Entware
             else
                 CMDBACKUP="$(echo "$1" | sed -n "s/^.*backup=//p" | awk '{print $1}')"
                 if [ "$CMDBACKUP" = "/tmp" ] || [ ! -d "$CMDBACKUP" ];then
@@ -857,7 +883,7 @@ fi
 # Remember to terminate the SQL 'WHERE' clause!
 [ -n "$WHERE" ] && WHERE=$WHERE")"
 
-if [ -z "$CMDNOFILTER" ];then       
+if [ -z "$CMDNOFILTER" ];then
     # Default filter
     if [ -z "$FILTER_INUSE" ];then
         DATE_FILTER=$(date "+%F")                                       # v1.05
@@ -962,7 +988,7 @@ if [ -z "$CMDNOSCRIPT" ];then
     RESULT_CNT=0                                                # v1.08 Total number of matching records
 
     echo -en $cBRED                                             # Just in case SQL error e.g. 'Error: database is locked'
-    
+
     [ "$CMDREPORT" = "CreateCSV" ] && rm $REPORT_CSV 2>/dev/null    # v1.12 Erase .csv report file
 
     # Display Summary count of matches  ONLY?
@@ -1041,19 +1067,19 @@ if [ -z "$CMDNOSCRIPT" ];then
                     else
                         COLOUR_TIME=$cRESET
                     fi
-                    
+
                     if echo "$MAC" | grep -qE "$MAC_FILTER" ;then           # v1.12
                         COLOUR_MAC=$cBRED
                     else
                         COLOUR_MAC=$cRESET
                     fi
-                    
+
                     if echo "$MAC" | grep -qE "$IP_FILTER" ;then            # v1.06 fix MAC filter match?
                         COLOUR_IP=$cBRED
                     else
                         COLOUR_IP=$cRESET
                     fi
-                    
+
                     if [ -n "$CMDIPFLUSH" ];then
                         COLOUR_URL=$cBRED
                         URL=$URL"**FLUSHED"
@@ -1075,8 +1101,8 @@ if [ -z "$CMDNOSCRIPT" ];then
                     if [ $SEND_EMAIL -eq 1 ];then
                         printf '%-12s %-10s %-20s %-18s %-16s http://%s\n' "$(echo $LINE | awk '{print $1" "$2}')" "$MAC" ""$(echo $DESC | awk '{print $1}')"" ""$(echo $DESC | awk '{print $NF}')"" ""$(echo $LINE | awk '{print $NF}')"" >>$MAILFILE # v1.08
                     fi
-                    
-                    # Slow...compared to 'sqlite3 -csv' invocation 
+
+                    # Slow...compared to 'sqlite3 -csv' invocation
                     if [ "$CMDREPORT" = "CreateCSV" ];then                      # v1.12
                         echo -e "\"$(echo $LINE | sed 's/|/ /' | awk '{print $1" "$2}')\",\""$MAC"\",\""$(echo $DESC | awk '{print $1}')""\",\"""$(echo $DESC | awk '{print $NF}')""\",\"""$(echo $LINE | awk 'BEGIN { FS = "|" } {print "http://"$3}')"\"" >>$REPORT_CSV
                     fi
@@ -1128,11 +1154,11 @@ if [ -z "$CMDNOSCRIPT" ];then
 else
     echo -e $cBYEL
     if [ -z "$CMDCOUNT" ];then                                                  # v1.10
-        if [ "$CMDREPORT" = "CreateCSV" ];then                                  # v1.12 
+        if [ "$CMDREPORT" = "CreateCSV" ];then                                  # v1.12
             [ $SHOWSQL -eq 1 ] && echo -e "sqlite3 -header -csv $SQL_DATABASE SELECT * FROM $SQL_TABLE;\n"  # v1.13
             sqlite3 -header -csv $SQL_DATABASE "SELECT * FROM $SQL_TABLE;" > $REPORT_CSV    # Use '*' for raw table
         else
-            # NOTE: Display/create the additional human-friendly timestamp! 
+            # NOTE: Display/create the additional human-friendly timestamp!
             [ $SHOWSQL -eq 1 ] && echo -e "sqlite3 $SQL_DATABASE SELECT datetime(timestamp, 'unixepoch', 'localtime') AS time, timestamp, mac, url FROM $SQL_TABLE $WHERE;\n"   # v1.13
             sqlite3 $SQL_DATABASE "SELECT datetime(timestamp, 'unixepoch', 'localtime') AS time, timestamp, mac, url FROM $SQL_TABLE $WHERE;"
         fi
@@ -1142,7 +1168,7 @@ else
     echo -e $cBGRE"\nTotal Records = "$SQL_TOTAL
 fi
 
-# "dpi: TrendMicro function can't use under load-balance mode" 
+# "dpi: TrendMicro function can't use under load-balance mode"
 # v1.10 Moved to after summary report
 if [ $(nvram get bwdpi_wh_enable) -eq 0 ];then
     echo -e $cBRED"\a\n**Warning $SQL_DB_DESC logging NOT currently enabled"$cRESET
