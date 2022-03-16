@@ -60,6 +60,7 @@ VER="v1.16"
 # [CODE]./WebHistory_Report.sh ip=10.88.8.18,10.88.8.17,10.88.8.16 | grep -F "youtube" | grep -E "cats" | grep "adopt"[CODE]
 
 # [URL="https://www.snbforums.com/threads/web-history-reporting-and-management-traffic-analyzer-aiprotection-monitor.49888/"]Web History Reporting and Management (Traffic Analyzer/Aiprotection Monitor)[/URL]
+
 Say(){
    echo -e $$ $@ | logger -st "($(basename $0))"
 }
@@ -907,7 +908,9 @@ if [ -z "$CMDNOSCRIPT" ];then
             RESULT_CNT=$(sqlite3 $SQL_DATABASE "SELECT datetime(timestamp, 'unixepoch', 'localtime') AS time, mac, url, count(*) FROM $SQL_TABLE $WHERE ORDER BY $SORTBY;"  | cut -d'|' -f4)
             nvram set tmp_WH_TOTAL=$RESULT_CNT
             StatusLine $CMDNOANSII"Clear"
-            StatusLine $CMDNOANSII"NoFLASH" ${IND}$aREVERSE"Summary: Result count = "$RESULT_CNT" "
+            StatusLine $CMDNOANSII"NoFLASH" ${IND}$aREVERSE"Summary: Result count = "$RESULT_CNT", $REPORT_CSV created"
+            
+            echo -e $cBGRE"\n\t\t[✔]${cBMAG} $REPORT_CSV ${cBGRE}created $cRESET"
         else
             [ $SHOWSQL -eq 1 ] && echo -e "sqlite3 $SQL_DATABASE SELECT datetime(timestamp, 'unixepoch', 'localtime') AS time, mac, url FROM $SQL_TABLE $WHERE ORDER BY $SORTBY;\n" # v1.13
             sqlite3 $SQL_DATABASE "SELECT datetime(timestamp, 'unixepoch', 'localtime') AS time, mac, url FROM $SQL_TABLE $WHERE ORDER BY $SORTBY;" | while IFS= read -r LINE
