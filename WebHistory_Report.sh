@@ -443,7 +443,7 @@ fi
 SQL_DB_DESC="Web History"
 SQL_TABLE="history"
 SQL_DATABASE=
-SQL_ADDONS_DATABASE="/jffs/configs/WebHistoryAddons.db"                             # v1.16
+SQL_ADDONS_DATABASE="/jffs/.sys/WebHistory/Addons.db"                             # v1.16
 TITLE=$SQL_DB_DESC" starting....."
 
 FILTER_INUSE=
