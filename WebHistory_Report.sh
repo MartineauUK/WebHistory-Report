@@ -1,6 +1,6 @@
 #!/bin/sh
-VER="v1.16"
-#======================================================================================= © 2016-2022 Martineau v1.16
+VER="v1.17"
+#======================================================================================= © 2016-2023 Martineau v1.17
 #
 # Scan Web History database
 #
@@ -183,9 +183,6 @@ SendMail(){
 
     Say "You need to edit this script and add the Sendmail function first!"
 
-
-    rm "/tmp/Mail_$$.txt" 2>/dev/null                   # Just in case we created a prepend file!
-
     return 0
 
 }
@@ -296,8 +293,11 @@ Convert_TO_IP() {
 
            if [ -z "$IP_RANGE" ];then       # Not PINGable so lookup static
 
-              #IP_RANGE=$(grep -i "$IP_NAME" /etc/hosts.dnsmasq  | awk '{print $1}')
-              IP_RANGE=$(grep "$IP_NAME" /etc/dnsmasq.conf | grep -E "192.168.1.38$")
+              [ -f /etc/hosts.dnsmasq ] && IP_RANGE=$(grep -i "$IP_NAME" /etc/hosts.dnsmasq  | awk '{print $1}')	# v1.17
+
+			  if [ -z "$IP_RANGE" ] && [ -f /jffs/addons/YazDHCP.d/.hostnames ];then								# v1.17
+				IP_RANGE=$(grep -i "$IP_NAME" /jffs/addons/YazDHCP.d/.hostnames | awk '{print $1}')					# v1.17
+			  fi
 
               #logger -s -t "($(basename $0))" $$ "Lookup '$IP_NAME' in DNSMASQ returned:>$IP_RANGE<"
 
@@ -307,8 +307,7 @@ Convert_TO_IP() {
               #
               if [ -z "$IP_RANGE" ] && [ -f $USEPATH/IPGroups ];then
                  #IP_RANGE=$(grep -i "^$IP_NAME" $USEPATH/IPGroups | awk '{print $2}')
-                 IP_RANGE=$(grep -i "^$IP_NAME" $USEPATH/IPGroups  | awk '{$1=""; print $0}')   # All columns except 1st to allow '#comments' and
-    #                                                                                                   #     spaces and ',' between IPs v1.07
+                 IP_RANGE=$(grep -i "^$IP_NAME" $USEPATH/IPGroups  | awk '{$1=""; print $0}')   # All columns except 1st to allow '#comments' an                                                                                                   #     spaces and ',' between IPs v1.07
                  #logger -s -t "($(basename $0))" $$ "Lookup '$IP_NAME' in '$USEPATH/IPGroups' returned:>$IP_RANGE<"
               fi
            fi
@@ -355,33 +354,47 @@ MAC_to_IP() {
         local RESULT=
 
         if [ $FIRMWARE -gt 38201 ];then
-            # etc/ethers no longer exists/used
-            # Instead /etc/dnsmasq.conf contains
-            #         dhcp-host=00:22:B0:B5:BB:1A,10.88.8.254
-            # v386+
-            #         dhcp-host=48:45:20:D7:A6:22,set:48:45:20:D7:A6:22,HP-Envy13,192.168.1.38
-            FN="/etc/dnsmasq.conf"
-            #local ADDR_LIST=$(grep -i "$MAC" "$FN" | awk 'BEGIN {FS=","} {print $2}')
-            local ADDR_LIST=$(grep -i "$MAC" "$FN" | awk 'BEGIN {FS=","} {print $4}')               # v1.15
+
+			# Check if YazDHCP installed
+			FN="/jffs/addons/YazDHCP.d/.staticlist"							# v1.17
+			if [ -f "$FN" ];then											# v1.17
+				local IP_ADDR=$(grep -iE "$MAC" "$FN" | cut -d',' -f3 )		# v1.17
+				if [ -n "$IP_ADDR" ];then									# v1.17
+					FN="/jffs/addons/YazDHCP.d/.hostnames"					# v1.17
+					HOST_NAME=$(grep "^$IP_ADDR" "$FN" | cut -d' ' -f2)		# v1.17
+					RESULT=$HOST_NAME" "$IP_ADDR							# v1.17
+				fi															# v1.17
+			else															# v1.17
+				# etc/ethers no longer exists/used
+				# Instead /etc/dnsmasq.conf contains
+				#         dhcp-host=00:22:B0:B5:BB:1A,10.88.8.254
+				# v386+
+				#         dhcp-host=48:45:20:D7:A6:22,set:48:45:20:D7:A6:22,HP-Envy13,192.168.1.38
+				FN="/etc/dnsmasq.conf"
+				#local ADDR_LIST=$(grep -i "$MAC" "$FN" | awk 'BEGIN {FS=","} {print $2}')
+				[ -z "ADDR_LIST" ] && local ADDR_LIST=$(grep -i "$MAC" "$FN" | awk 'BEGIN {FS=","} {print $4}')               # v1.17 v1.15
+			fi
         else
             local ADDR_LIST=$(grep -i "$MAC" "$FN" | awk '{print $2}')
         fi
 
-        if [ -n "$ADDR_LIST" ];then
-            IP_RANGE=$ADDR_LIST
-            IP_ADDR=$(grep   -iE "$IP_RANGE" $FN | awk 'BEGIN {FS=","} {print $4}')                 # v1.15
-            HOST_NAME=$(grep -iE "$IP_RANGE" $FN | awk 'BEGIN {FS=","} {print $3}')                 # v1.15
-            RESULT=$HOST_NAME" "$IP_ADDR
-        else
-            ADDR_LIST="$(arp -a | awk '{print $2","$4","$1}' | tr -d '()' | grep -iF "$MAC")"       # v1.15
-            if [ -n "$ADDR_LIST" ];then                                                             # v1.15
-                IP_ADDR=$(echo "$ADDR_LIST" | awk 'BEGIN {FS=","} {print $1}')                      # v1.15
-                HOST_NAME=$(echo "$ADDR_LIST" | awk 'BEGIN {FS=","} {print $3}')                    # v1.15
-                RESULT=$HOST_NAME" "$IP_ADDR
-            else
-                RESULT="***ERROR MAC Address not on LAN ("$FN"): '"$2"'"
-            fi
-        fi
+		if [ -z "$RESULT" ];then																		# v1.17
+			if [ -n "$ADDR_LIST" ];then
+				IP_RANGE=$ADDR_LIST
+				IP_ADDR=$(grep   -iE "$IP_RANGE" $FN | awk 'BEGIN {FS=","} {print $4}')                 # v1.15
+				HOST_NAME=$(grep -iE "$IP_RANGE" $FN | awk 'BEGIN {FS=","} {print $3}')                 # v1.15
+				RESULT=$HOST_NAME" "$IP_ADDR
+			else
+				ADDR_LIST="$(arp -a | awk '{print $2","$4","$1}' | tr -d '()' | grep -iF "$MAC")"       # v1.15
+				if [ -n "$ADDR_LIST" ];then                                                             # v1.15
+					IP_ADDR=$(echo "$ADDR_LIST" | awk 'BEGIN {FS=","} {print $1}')                      # v1.15
+					HOST_NAME=$(echo "$ADDR_LIST" | awk 'BEGIN {FS=","} {print $3}')                    # v1.15
+					RESULT=$HOST_NAME" "$IP_ADDR
+				else
+					RESULT="***ERROR MAC Address not on LAN ("$FN"): '"$2"'"
+				fi
+			fi
+		fi
 
         echo "$RESULT"
 }
@@ -909,7 +922,7 @@ if [ -z "$CMDNOSCRIPT" ];then
             nvram set tmp_WH_TOTAL=$RESULT_CNT
             StatusLine $CMDNOANSII"Clear"
             StatusLine $CMDNOANSII"NoFLASH" ${IND}$aREVERSE"Summary: Result count = "$RESULT_CNT", $REPORT_CSV created"
-            
+
             echo -e $cBGRE"\n\t\t[✔]${cBMAG} $REPORT_CSV ${cBGRE}created $cRESET"
         else
             [ $SHOWSQL -eq 1 ] && echo -e "sqlite3 $SQL_DATABASE SELECT datetime(timestamp, 'unixepoch', 'localtime') AS time, mac, url FROM $SQL_TABLE $WHERE ORDER BY $SORTBY;\n" # v1.13
